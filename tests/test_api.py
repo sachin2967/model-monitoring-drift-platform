@@ -1,6 +1,7 @@
 """Unit tests for MLOps drift monitoring FastAPI endpoints."""
 
 from fastapi.testclient import TestClient
+
 from api.app import app
 
 client = TestClient(app)
@@ -11,7 +12,7 @@ def test_health_endpoint():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
-    assert "reference_loaded" in data
+    assert data["reference_loaded"] is True
 
 
 def test_benchmark_endpoint():
@@ -20,18 +21,17 @@ def test_benchmark_endpoint():
     data = response.json()
     assert "benchmark_summary" in data
     assert "simulated_windows" in data
-    assert data["benchmark_summary"]["critical_lead_indicator"] is True
+    assert "inference" in data["benchmark_summary"]
+    assert "lead-time claim" in data["benchmark_summary"]["inference"]
 
 
 def test_monitor_batch_endpoint():
     sample_records = [
         {
-            "total_gmv": 1500.0,
-            "total_items": 10,
-            "avg_item_price": 150.0,
+            "total_gmv": 0.1,
+            "freight_ratio": -0.2,
             "avg_delivery_delay": 0.5,
-            "mean_review_score": 4.5,
-            "orders_per_month": 2.0,
+            "avg_carrier_handoff": 0.1,
         }
         for _ in range(25)
     ]

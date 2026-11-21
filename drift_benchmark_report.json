@@ -1,66 +1,112 @@
 {
+  "evaluation_type": "controlled synthetic drift sensitivity and model-metric demonstration",
+  "seed": 42,
+  "training_rows": 4000,
+  "validation_rows_per_window": 1000,
+  "model": "median imputation + logistic regression fitted on synthetic baseline data",
   "benchmark_summary": {
     "correlation_calculated": true,
     "total_windows_evaluated": 6,
-    "psi_vs_f1_correlation": -0.6299,
-    "psi_vs_roc_auc_correlation": null,
-    "critical_lead_indicator": true,
-    "summary": "Strong negative correlation: high PSI reliably predicts downstream model degradation."
+    "psi_vs_f1_correlation": 0.7594,
+    "psi_vs_roc_auc_correlation": 0.5648,
+    "inference": "Descriptive association across this small controlled set only; no p-value, significance, causality, or lead-time claim."
   },
+  "limitations": [
+    "Synthetic data and scenarios do not establish production monitoring performance.",
+    "Six designed windows are descriptive; correlations have no significance test.",
+    "This experiment makes no causal or lead-time claim.",
+    "Feature drift can occur without performance degradation, and concept drift may occur without feature drift."
+  ],
   "simulated_windows": [
     {
       "window_id": "W1_Stable",
-      "description": "Clean production window with organic variance (No drift)",
-      "drift_status": "CRITICAL_DRIFT",
-      "drifted_features_count": 9,
-      "max_psi": 0.1884,
-      "f1_score": 1.0,
-      "roc_auc": 1.0
+      "scenario": "baseline_clean",
+      "drift_status": "HEALTHY",
+      "drifted_features_count": 0,
+      "max_psi": 0.0114,
+      "f1_score": 0.7043,
+      "roc_auc": 0.7473,
+      "missing_fraction": {
+        "avg_delivery_delay": 0.0,
+        "avg_carrier_handoff": 0.0,
+        "freight_ratio": 0.0,
+        "total_gmv": 0.0
+      }
     },
     {
       "window_id": "W2_Mild_Shift",
-      "description": "Mild shipping delay shift (1.0 std shift)",
-      "drift_status": "CRITICAL_DRIFT",
-      "drifted_features_count": 10,
-      "max_psi": 1.2674,
-      "f1_score": 1.0,
-      "roc_auc": 1.0
+      "scenario": "mild_covariate",
+      "drift_status": "WARNING",
+      "drifted_features_count": 1,
+      "max_psi": 0.2678,
+      "f1_score": 0.7782,
+      "roc_auc": 0.7767,
+      "missing_fraction": {
+        "avg_delivery_delay": 0.0,
+        "avg_carrier_handoff": 0.0,
+        "freight_ratio": 0.0,
+        "total_gmv": 0.0
+      }
     },
     {
       "window_id": "W3_Severe_Covariate",
-      "description": "Severe carrier handoff delay inflation (2.5 std shift)",
-      "drift_status": "CRITICAL_DRIFT",
-      "drifted_features_count": 10,
-      "max_psi": 7.6832,
-      "f1_score": 0.9635036496350365,
-      "roc_auc": 1.0
+      "scenario": "severe_covariate",
+      "drift_status": "WARNING",
+      "drifted_features_count": 1,
+      "max_psi": 1.6301,
+      "f1_score": 0.8368,
+      "roc_auc": 0.8017,
+      "missing_fraction": {
+        "avg_delivery_delay": 0.0,
+        "avg_carrier_handoff": 0.0,
+        "freight_ratio": 0.0,
+        "total_gmv": 0.0
+      }
     },
     {
       "window_id": "W4_Concept_Drift",
-      "description": "Market disruption: High-delay sellers maintain good reviews",
-      "drift_status": "CRITICAL_DRIFT",
-      "drifted_features_count": 9,
-      "max_psi": 0.1884,
-      "f1_score": 0.9361702127659575,
-      "roc_auc": 1.0
+      "scenario": "concept_drift",
+      "drift_status": "HEALTHY",
+      "drifted_features_count": 0,
+      "max_psi": 0.0238,
+      "f1_score": 0.4502,
+      "roc_auc": 0.4885,
+      "missing_fraction": {
+        "avg_delivery_delay": 0.0,
+        "avg_carrier_handoff": 0.0,
+        "freight_ratio": 0.0,
+        "total_gmv": 0.0
+      }
     },
     {
       "window_id": "W5_Pipeline_Corruption",
-      "description": "Upstream telemetry corruption: 30% missing values in freight",
-      "drift_status": "CRITICAL_DRIFT",
-      "drifted_features_count": 9,
-      "max_psi": 0.1884,
-      "f1_score": 1.0,
-      "roc_auc": 1.0
+      "scenario": "null_spike",
+      "drift_status": "WARNING",
+      "drifted_features_count": 1,
+      "max_psi": 0.0203,
+      "f1_score": 0.7033,
+      "roc_auc": 0.735,
+      "missing_fraction": {
+        "avg_delivery_delay": 0.0,
+        "avg_carrier_handoff": 0.0,
+        "freight_ratio": 0.3,
+        "total_gmv": 0.0
+      }
     },
     {
       "window_id": "W6_Critical_MultiDrift",
-      "description": "Systemic logistics disruption: delay + freight + carrier shifts",
+      "scenario": "multi_drift",
       "drift_status": "CRITICAL_DRIFT",
-      "drifted_features_count": 11,
-      "max_psi": 8.2579,
-      "f1_score": 0.9076923076923077,
-      "roc_auc": 1.0
+      "drifted_features_count": 3,
+      "max_psi": 1.7247,
+      "f1_score": 0.9434,
+      "roc_auc": 0.8197,
+      "missing_fraction": {
+        "avg_delivery_delay": 0.0,
+        "avg_carrier_handoff": 0.0,
+        "freight_ratio": 0.0,
+        "total_gmv": 0.0
+      }
     }
   ]
 }

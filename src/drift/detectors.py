@@ -5,7 +5,8 @@ Wasserstein distance, and Chi-Square tests for continuous and categorical featur
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
+
 import numpy as np
 import pandas as pd
 from scipy.stats import chi2_contingency, ks_2samp, wasserstein_distance
@@ -14,21 +15,26 @@ from scipy.stats import chi2_contingency, ks_2samp, wasserstein_distance
 @dataclass
 class FeatureDriftReport:
     """Detailed drift status for a single monitored feature."""
+
     feature_name: str
     feature_type: str  # 'numerical' or 'categorical'
-    psi_score: Optional[float]
-    ks_statistic: Optional[float]
-    ks_p_value: Optional[float]
-    wasserstein_dist: Optional[float]
-    chi2_stat: Optional[float]
-    chi2_p_value: Optional[float]
+    psi_score: float | None
+    ks_statistic: float | None
+    ks_p_value: float | None
+    wasserstein_dist: float | None
+    missing_fraction: float
+    chi2_stat: float | None
+    chi2_p_value: float | None
     drift_detected: bool
     severity: str  # 'GREEN', 'YELLOW', 'RED'
     message: str
 
 
 def calculate_psi(
-    reference: np.ndarray, current: np.ndarray, num_bins: int = 10, epsilon: float = 1e-4
+    reference: np.ndarray,
+    current: np.ndarray,
+    num_bins: int = 10,
+    epsilon: float = 1e-4,
 ) -> float:
     """Calculates the Population Stability Index (PSI) between reference and current samples.
 
@@ -76,24 +82,41 @@ class DriftMonitorEngine:
     def __init__(self, psi_threshold: float = 0.20, ks_alpha: float = 0.01):
         self.psi_threshold = psi_threshold
         self.ks_alpha = ks_alpha
-        self.reference_df: Optional[pd.DataFrame] = None
-        self.numerical_cols: List[str] = []
-        self.categorical_cols: List[str] = []
+        self.reference_df: pd.DataFrame | None = None
+        self.numerical_cols: list[str] = []
+        self.categorical_cols: list[str] = []
 
     def set_reference(self, df: pd.DataFrame):
         """Freezes reference distribution (e.g. training set)."""
         self.reference_df = df.copy()
         # Exclude IDs and target outcomes
-        ignore_cols = {"seller_id", "order_id", "customer_id", "product_id", "review_id", "is_at_risk"}
-        self.numerical_cols = [c for c in df.select_dtypes(include=[np.number]).columns if c not in ignore_cols]
-        self.categorical_cols = [c for c in df.select_dtypes(exclude=[np.number]).columns if c not in ignore_cols]
+        ignore_cols = {
+            "seller_id",
+            "order_id",
+            "customer_id",
+            "product_id",
+            "review_id",
+            "is_at_risk",
+        }
+        self.numerical_cols = [
+            c
+            for c in df.select_dtypes(include=[np.number]).columns
+            if c not in ignore_cols
+        ]
+        self.categorical_cols = [
+            c
+            for c in df.select_dtypes(exclude=[np.number]).columns
+            if c not in ignore_cols
+        ]
 
-    def evaluate_batch(self, current_df: pd.DataFrame) -> Dict[str, Any]:
+    def evaluate_batch(self, current_df: pd.DataFrame) -> dict[str, Any]:
         """Evaluates an incoming live batch against the frozen reference distribution."""
         if self.reference_df is None:
-            raise ValueError("Reference distribution must be set before evaluating batches.")
+            raise ValueError(
+                "Reference distribution must be set before evaluating batches."
+            )
 
-        feature_reports: List[FeatureDriftReport] = []
+        feature_reports: list[FeatureDriftReport] = []
         drift_count = 0
 
         # 1. Numerical Features
@@ -102,9 +125,27 @@ class DriftMonitorEngine:
                 continue
 
             ref_vals = self.reference_df[col].dropna().values
+            missing_fraction = float(current_df[col].isna().mean())
             curr_vals = current_df[col].dropna().values
 
             if len(curr_vals) == 0:
+                feature_reports.append(
+                    FeatureDriftReport(
+                        feature_name=col,
+                        feature_type="numerical",
+                        psi_score=None,
+                        ks_statistic=None,
+                        ks_p_value=None,
+                        wasserstein_dist=None,
+                        missing_fraction=missing_fraction,
+                        chi2_stat=None,
+                        chi2_p_value=None,
+                        drift_detected=True,
+                        severity="RED",
+                        message="All current values are missing.",
+                    )
+                )
+                drift_count += 1
                 continue
 
             psi = calculate_psi(ref_vals, curr_vals)
@@ -112,12 +153,19 @@ class DriftMonitorEngine:
             wass = float(wasserstein_distance(ref_vals, curr_vals))
 
             # Determine severity based on calibrated PSI and KS test
-            if psi >= self.psi_threshold:
+            if missing_fraction >= 0.20:
+                severity = "RED"
+                drift_detected = True
+                drift_count += 1
+                msg = f"High missingness detected ({missing_fraction:.1%}); non-missing PSI={psi:.3f}"
+            elif psi >= self.psi_threshold:
                 severity = "RED"
                 drift_detected = True
                 drift_count += 1
                 msg = f"Significant numerical drift detected (PSI={psi:.3f}, KS p-val={ks_res.pvalue:.4e})"
-            elif psi >= 0.10 or (ks_res.pvalue < self.ks_alpha and wass > (0.2 * np.std(ref_vals))):
+            elif psi >= 0.10 or (
+                ks_res.pvalue < self.ks_alpha and wass > (0.2 * np.std(ref_vals))
+            ):
                 severity = "YELLOW"
                 drift_detected = True
                 drift_count += 1
@@ -127,19 +175,22 @@ class DriftMonitorEngine:
                 drift_detected = False
                 msg = f"Distribution is stable (PSI={psi:.3f})"
 
-            feature_reports.append(FeatureDriftReport(
-                feature_name=col,
-                feature_type="numerical",
-                psi_score=psi,
-                ks_statistic=float(np.round(ks_res.statistic, 4)),
-                ks_p_value=float(ks_res.pvalue),
-                wasserstein_dist=float(np.round(wass, 4)),
-                chi2_stat=None,
-                chi2_p_value=None,
-                drift_detected=drift_detected,
-                severity=severity,
-                message=msg,
-            ))
+            feature_reports.append(
+                FeatureDriftReport(
+                    feature_name=col,
+                    feature_type="numerical",
+                    psi_score=psi,
+                    ks_statistic=float(np.round(ks_res.statistic, 4)),
+                    ks_p_value=float(ks_res.pvalue),
+                    wasserstein_dist=float(np.round(wass, 4)),
+                    missing_fraction=missing_fraction,
+                    chi2_stat=None,
+                    chi2_p_value=None,
+                    drift_detected=drift_detected,
+                    severity=severity,
+                    message=msg,
+                )
+            )
 
         # 2. Categorical Features
         for col in self.categorical_cols:
@@ -166,19 +217,22 @@ class DriftMonitorEngine:
                 drift_detected = False
                 msg = f"Categorical distribution stable (p={p_val:.4f})"
 
-            feature_reports.append(FeatureDriftReport(
-                feature_name=col,
-                feature_type="categorical",
-                psi_score=None,
-                ks_statistic=None,
-                ks_p_value=None,
-                wasserstein_dist=None,
-                chi2_stat=float(np.round(chi2, 4)),
-                chi2_p_value=float(p_val),
-                drift_detected=drift_detected,
-                severity=severity,
-                message=msg,
-            ))
+            feature_reports.append(
+                FeatureDriftReport(
+                    feature_name=col,
+                    feature_type="categorical",
+                    psi_score=None,
+                    ks_statistic=None,
+                    ks_p_value=None,
+                    wasserstein_dist=None,
+                    missing_fraction=float(current_df[col].isna().mean()),
+                    chi2_stat=float(np.round(chi2, 4)),
+                    chi2_p_value=float(p_val),
+                    drift_detected=drift_detected,
+                    severity=severity,
+                    message=msg,
+                )
+            )
 
         total_features = len(feature_reports)
         drift_percentage = round((drift_count / max(total_features, 1)) * 100, 1)

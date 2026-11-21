@@ -3,7 +3,7 @@
     "correlation_calculated": true,
     "total_windows_evaluated": 6,
     "psi_vs_f1_correlation": -0.6299,
-    "psi_vs_roc_auc_correlation": NaN,
+    "psi_vs_roc_auc_correlation": null,
     "critical_lead_indicator": true,
     "summary": "Strong negative correlation: high PSI reliably predicts downstream model degradation."
   },

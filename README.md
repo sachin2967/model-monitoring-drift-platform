@@ -4,6 +4,28 @@ A Python demonstration of tabular feature monitoring using PSI, two-sample KS te
 
 This is a **portfolio prototype**, not a production monitoring service. The experiment uses generated data and six deliberately designed scenarios. Its correlations are descriptive only; it does not establish statistical significance, causality, or lead time. Feature drift is not equivalent to model failure, and performance monitoring requires reliable delayed labels and a separately specified evaluation design.
 
+The original API uses a synthetic reference so the demo starts without private data. `/api/monitor/batch` accepts 25–5,000 records with exactly the four monitored numeric features. Malformed, incomplete or oversized batches are rejected. Compose binds API/dashboard to loopback ports 8030/8530. The separate fraud-pilot interface below adds reference identity, operator authentication and persistent reports. Automated alert delivery and model promotion remain unimplemented.
+
+## Fraud-pilot interface
+
+`POST /api/monitor/fraud-window` consumes `fraud-events-v1` exports. It requires
+`FRAUD_REFERENCE_PATH`, exported from the matching fraud model's training partition;
+there is no synthetic fallback. Duplicate events, incompatible model/feature/policy
+versions and invalid label timestamps are rejected. Distribution diagnostics and
+available/mature-label metrics are separate; coverage and minimum sample counts are
+explicit. Single-class cohorts do not publish ROC-AUC/AP. Reports persist and can be
+retrieved with `GET /api/reports/{report_id}`.
+
+Production mode requires a 32+ character `DRIFT_API_KEY`, persistent
+`DRIFT_STATE_PATH`, reference path and trusted `FRAUD_REFERENCE_SHA256`. Non-health
+routes require `X-API-Key` when configured; bodies are capped at 4 MiB. `/live` checks
+the process; `/ready` also checks history and reference configuration. This is an
+operator-only pilot, not multi-tenant or highly available hosting. The standalone [operations guide](docs/OPERATIONS.md) describes the service; the
+[portfolio runbook](https://github.com/sachin2967/ml-portfolio/blob/main/OPERATIONS_RUNBOOK.md) describes cross-service integration. The default Streamlit page remains synthetic;
+the separate **Fraud Pilot** page retrieves persisted reports by ID using server-side
+`DRIFT_API_URL` / `DRIFT_API_KEY`. It shows label coverage and insufficient/single-class
+states, clears stale results on lookup errors, and never exposes the operator key.
+
 ## Experiment
 
 ```bash
@@ -25,8 +47,19 @@ The benchmark trains a median-imputation + logistic-regression classifier on see
 - The six windows are designed cases, not independent random repetitions. Their Pearson correlation is exploratory; no inferential test is performed.
 - The controlled time windows have no timestamps or repeated trajectories, so the experiment cannot support “lead indicator,” “predicts failure,” or “degradation by days” claims.
 - The sample model, feature distributions, labels, and injected shifts are synthetic; no production seller or customer dataset is bundled or required.
-- The API/UI are demonstration surfaces. Authentication, access control, persistence, alert delivery, monitoring of the monitor, and load testing are outside scope.
+- The synthetic UI remains a demonstration. The fraud API adds operator authentication and persistent reports; tenant authorization, automated alert delivery, monitoring of the monitor and cloud availability/load evidence remain open.
+- The default API reference is synthetic. Real deployment requires a validated, versioned training/reference dataset, threshold governance, authenticated access, label-aware performance monitoring, data retention controls, and operational runbooks.
 
 ## Methods
 
 For numeric features, PSI uses bins derived from the reference distribution; KS and Wasserstein compare non-missing samples. Missingness is reported separately and a high current missing fraction is flagged. Categorical features use a chi-square contingency test. The overall status aggregates feature flags and should be interpreted as a configurable heuristic, not a calibrated risk probability.
+
+## Release verification and operations
+
+The 22 November 2026 local verification passed **28 tests** and repository lint.
+The API image passed non-root, network-isolated reference, report persistence and serving checks.
+
+See the standalone [operations guide](docs/OPERATIONS.md) for configuration,
+failure handling, recovery and rollout limits. Cross-project reports and replay tools
+live in the separate [portfolio guide](https://github.com/sachin2967/ml-portfolio).
+Hosted CI and cloud deployment are separate checks; a local pass does not imply either.

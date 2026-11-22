@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from src.drift.detectors import DriftMonitorEngine, calculate_psi
 
@@ -64,3 +65,23 @@ def test_high_missingness_is_reported_and_flagged():
     feature = report["reports"][0]
     assert feature["missing_fraction"] == 0.30
     assert feature["drift_detected"] is True
+
+
+def test_categorical_missingness_is_not_reported_as_stable():
+    engine = DriftMonitorEngine()
+    engine.set_reference(pd.DataFrame({"category": ["a", "b"] * 50}))
+    report = engine.evaluate_batch(
+        pd.DataFrame({"category": [None] * 30 + ["a", "b"] * 35})
+    )
+    feature = report["reports"][0]
+    assert feature["missing_fraction"] == 0.3
+    assert feature["severity"] == "RED"
+
+
+def test_reference_and_window_completeness_are_enforced():
+    engine = DriftMonitorEngine()
+    with pytest.raises(ValueError):
+        engine.set_reference(pd.DataFrame({"x": [np.nan] * 25}))
+    engine.set_reference(pd.DataFrame({"x": np.arange(25)}))
+    with pytest.raises(ValueError):
+        engine.evaluate_batch(pd.DataFrame({"another_feature": np.arange(25)}))

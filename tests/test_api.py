@@ -47,3 +47,19 @@ def test_monitor_batch_endpoint():
 def test_invalid_batch_payload():
     response = client.post("/api/monitor/batch", json={"wrong_key": []})
     assert response.status_code == 422
+
+
+def test_monitor_rejects_missing_features_and_non_numeric_values():
+    rows = [{"avg_delivery_delay": 0.1, "avg_carrier_handoff": 0.2,
+             "freight_ratio": 0.3} for _ in range(25)]
+    assert client.post("/api/monitor/batch", json={"records": rows}).status_code == 422
+
+    rows = [{"avg_delivery_delay": "bad", "avg_carrier_handoff": 0.2,
+             "freight_ratio": 0.3, "total_gmv": 0.4} for _ in range(25)]
+    assert client.post("/api/monitor/batch", json={"records": rows}).status_code == 422
+
+
+def test_monitor_bounds_batch_size():
+    row = {"avg_delivery_delay": 0.1, "avg_carrier_handoff": 0.2,
+           "freight_ratio": 0.3, "total_gmv": 0.4}
+    assert client.post("/api/monitor/batch", json={"records": [row]}).status_code == 422

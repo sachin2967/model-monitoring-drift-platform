@@ -3,3 +3,10 @@ __pycache__/
 *$py.class
 .pytest_cache/
 .venv/
+var/
+.env
+*.sqlite3
+*.sqlite3-journal
+fraud_reference.json
+.env.*
+!.env.example

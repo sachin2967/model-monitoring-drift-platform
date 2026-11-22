@@ -88,6 +88,8 @@ class DriftMonitorEngine:
 
     def set_reference(self, df: pd.DataFrame):
         """Freezes reference distribution (e.g. training set)."""
+        if df.empty:
+            raise ValueError("Reference distribution must contain observations.")
         self.reference_df = df.copy()
         # Exclude IDs and target outcomes
         ignore_cols = {
@@ -108,12 +110,27 @@ class DriftMonitorEngine:
             for c in df.select_dtypes(exclude=[np.number]).columns
             if c not in ignore_cols
         ]
+        for column in self.numerical_cols + self.categorical_cols:
+            if df[column].dropna().empty:
+                raise ValueError(
+                    f"Reference feature {column!r} has no observed values."
+                )
+        for column in self.numerical_cols:
+            if not np.isfinite(df[column].dropna().to_numpy()).all():
+                raise ValueError(
+                    f"Reference feature {column!r} contains non-finite values."
+                )
 
     def evaluate_batch(self, current_df: pd.DataFrame) -> dict[str, Any]:
         """Evaluates an incoming live batch against the frozen reference distribution."""
         if self.reference_df is None:
             raise ValueError(
                 "Reference distribution must be set before evaluating batches."
+            )
+        required = set(self.numerical_cols + self.categorical_cols)
+        if current_df.empty or not required.issubset(current_df.columns):
+            raise ValueError(
+                "Current window must be non-empty and contain all reference features."
             )
 
         feature_reports: list[FeatureDriftReport] = []
@@ -152,7 +169,7 @@ class DriftMonitorEngine:
             ks_res = ks_2samp(ref_vals, curr_vals)
             wass = float(wasserstein_distance(ref_vals, curr_vals))
 
-            # Determine severity based on calibrated PSI and KS test
+            # Operational heuristics; thresholds have not been calibrated on live traffic.
             if missing_fraction >= 0.20:
                 severity = "RED"
                 drift_detected = True
@@ -199,6 +216,7 @@ class DriftMonitorEngine:
 
             ref_counts = self.reference_df[col].value_counts()
             curr_counts = current_df[col].value_counts()
+            missing_fraction = float(current_df[col].isna().mean())
 
             # Align categories
             categories = list(set(ref_counts.index).union(set(curr_counts.index)))
@@ -207,7 +225,12 @@ class DriftMonitorEngine:
 
             chi2, p_val, _, _ = chi2_contingency([r_vec, c_vec])
 
-            if p_val < self.ks_alpha:
+            if missing_fraction >= 0.20:
+                severity = "RED"
+                drift_detected = True
+                drift_count += 1
+                msg = f"High categorical missingness ({missing_fraction:.1%}); observed categories evaluated separately."
+            elif p_val < self.ks_alpha:
                 severity = "RED"
                 drift_detected = True
                 drift_count += 1

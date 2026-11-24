@@ -42,6 +42,19 @@ The benchmark trains a median-imputation + logistic-regression classifier on see
 
 ## Interpretation and limits
 
+### Repeated sensitivity and false-alert study
+
+`python scripts/evaluate_repeated_drift.py` runs 100 independently seeded windows
+per scenario at each of two sample sizes, for 1,000 evaluations. The
+[report](repeated_drift_report.json) separates any-feature flags from aggregate
+window alerts and includes 95% Wilson intervals. Conditional on one fixed
+synthetic reference, stable-window alerts occurred in 4/100 windows of 250 rows
+and 0/100 windows of 1,000 rows. Both designed mean shifts and 30% missingness
+were flagged in all repetitions. Reversing labels leaves features unchanged:
+the alert rate stays at the stable rate while mean model AUC falls to about
+0.25. These are synthetic experiments with fixed thresholds, not estimates of
+production sensitivity, a calibrated false-positive guarantee or a retraining rule.
+
 - PSI and distance metrics measure distribution differences, not downstream business harm. Thresholds are operational heuristics and need calibration for the data and sample sizes in use.
 - KS and chi-square p-values depend on assumptions and sample size. They are included as diagnostics, not automatic proof of material drift.
 - The six windows are designed cases, not independent random repetitions. Their Pearson correlation is exploratory; no inferential test is performed.
@@ -56,7 +69,7 @@ For numeric features, PSI uses bins derived from the reference distribution; KS 
 
 ## Release verification and operations
 
-The 22 November 2026 local verification passed **28 tests** and repository lint.
+The latest 22 November 2026 local verification passed **34 tests** and repository lint.
 The API image passed non-root, network-isolated reference, report persistence and serving checks.
 
 See the standalone [operations guide](docs/OPERATIONS.md) for configuration,

@@ -53,6 +53,30 @@ What this shows, and what it doesn't:
   (PSI vs F1 0.759, PSI vs ROC-AUC 0.565) are descriptive only: no significance test,
   no causal claim, no lead-time claim.
 
+### Repeated synthetic trials
+
+Ran 1,000 scenario-window evaluations
+against one frozen synthetic reference. An alert is any window status other
+than `HEALTHY`. The table shows the alert rate and Wilson interval.
+
+| Window rows | Scenario | Alert rate | 95% Wilson interval | Mean ROC-AUC |
+| ---: | --- | ---: | ---: | ---: |
+| 250 | Stable null (false alerts) | 4.0% | 1.6%–9.8% | 0.744 |
+| 250 | Larger feature shift | 100.0% | 96.3%–100.0% | 0.746 |
+| 250 | Pure label reversal | 4.0% | 1.6%–9.8% | 0.256 |
+| 1,000 | Stable null (false alerts) | 0.0% | 0.0%–3.7% | 0.748 |
+| 1,000 | Larger feature shift | 100.0% | 96.3%–100.0% | 0.752 |
+| 1,000 | Pure label reversal | 0.0% | 0.0%–3.7% | 0.252 |
+
+These rates are conditional on the frozen reference and fixed, uncorrected
+thresholds. Pure label reversal leaves the feature windows identical to the
+stable null, so the feature alert rates match despite the change in model ROC-AUC.
+The [report](repeated_drift_report.json) includes all scenarios and intervals.
+
+```bash
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python scripts/evaluate_repeated_drift.py
+```
+
 ## Architecture
 
 ```mermaid
@@ -85,7 +109,7 @@ cd model-monitoring-drift-platform
 python -m venv .venv && source .venv/bin/activate     # Windows: .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 make experiment   # regenerate drift_benchmark_report.json
-make test         # lint + 28 tests
+make test         # lint and tests
 make api          # http://127.0.0.1:8030/docs
 make dashboard    # Streamlit cockpit
 ```
@@ -129,7 +153,7 @@ operational heuristics that have not been calibrated on live traffic.
 | `api/app.py` | FastAPI application |
 | `streamlit_app/` | Synthetic dashboard plus **Fraud Pilot** page |
 | `scripts/run_drift_experiments.py` | Reproducible synthetic experiment |
-| `tests/` | 28 tests |
+| `tests/` | Detector, validation, and API tests |
 | `docs/` | Architecture, limits, operations |
 
 ## Limitations

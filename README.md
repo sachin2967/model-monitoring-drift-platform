@@ -1,65 +1,150 @@
-# Model Drift Monitoring Demonstration
+# Model Drift Monitoring Platform
 
-A Python demonstration of tabular feature monitoring using PSI, two-sample KS tests, Wasserstein distance, and a categorical chi-square test. It includes a FastAPI batch endpoint, a Streamlit cockpit, and a reproducible synthetic experiment using a fitted logistic-regression classifier.
+[![CI](https://github.com/sachin2967/model-monitoring-drift-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/sachin2967/model-monitoring-drift-platform/actions/workflows/ci.yml)
+![Python 3.11](https://img.shields.io/badge/python-3.11-blue)
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
-This is a **portfolio prototype**, not a production monitoring service. The experiment uses generated data and six deliberately designed scenarios. Its correlations are descriptive only; it does not establish statistical significance, causality, or lead time. Feature drift is not equivalent to model failure, and performance monitoring requires reliable delayed labels and a separately specified evaluation design.
+Tabular drift monitoring (PSI, KS, Wasserstein, chi-square, missingness) with a
+synthetic demonstration, and a separate fraud-pilot interface that monitors real
+exported prediction cohorts against a versioned training-only reference.
 
-The original API uses a synthetic reference so the demo starts without private data. `/api/monitor/batch` accepts 25–5,000 records with exactly the four monitored numeric features. Malformed, incomplete or oversized batches are rejected. Compose binds API/dashboard to loopback ports 8030/8530. The separate fraud-pilot interface below adds reference identity, operator authentication and persistent reports. Automated alert delivery and model promotion remain unimplemented.
+> **Scope.** A portfolio prototype, not a production monitoring service. The
+> demonstration experiment uses generated data and six designed scenarios. Feature
+> drift is not model failure; performance monitoring needs reliable delayed labels.
 
-## Fraud-pilot interface
+## Highlights
 
-`POST /api/monitor/fraud-window` consumes `fraud-events-v1` exports. It requires
-`FRAUD_REFERENCE_PATH`, exported from the matching fraud model's training partition;
-there is no synthetic fallback. Duplicate events, incompatible model/feature/policy
-versions and invalid label timestamps are rejected. Distribution diagnostics and
-available/mature-label metrics are separate; coverage and minimum sample counts are
-explicit. Single-class cohorts do not publish ROC-AUC/AP. Reports persist and can be
-retrieved with `GET /api/reports/{report_id}`.
+- **Multiple detectors, reported separately:** quantile-binned PSI, two-sample KS,
+  Wasserstein distance, categorical chi-square and missing-fraction checks, rolled up
+  into a heuristic status (`HEALTHY`, `WARNING`, `CRITICAL_DRIFT`).
+- **Feature drift is not conflated with model quality.** The fraud interface reports
+  feature/score shift apart from mature-label metrics, with explicit label coverage and
+  minimum-sample states (fewer than 25 mature labels gives an insufficient-data result;
+  single-class cohorts publish no ROC-AUC or AP).
+- **Reference identity.** The fraud endpoint requires a training-only reference exported
+  from the matching model, checked by SHA-256 in production mode. There is no synthetic
+  fallback.
+- **Input hygiene:** duplicate events, incompatible model/feature/policy versions and
+  invalid label timestamps are rejected; batches are bounded (25-5,000 records).
+- **Persistent reports** retrievable by ID, with operator-key authentication in
+  production mode.
 
-Production mode requires a 32+ character `DRIFT_API_KEY`, persistent
-`DRIFT_STATE_PATH`, reference path and trusted `FRAUD_REFERENCE_SHA256`. Non-health
-routes require `X-API-Key` when configured; bodies are capped at 4 MiB. `/live` checks
-the process; `/ready` also checks history and reference configuration. This is an
-operator-only pilot, not multi-tenant or highly available hosting. The standalone [operations guide](docs/OPERATIONS.md) describes the service; the
-[portfolio runbook](https://github.com/sachin2967/ml-portfolio/blob/main/OPERATIONS_RUNBOOK.md) describes cross-service integration. The default Streamlit page remains synthetic;
-the separate **Fraud Pilot** page retrieves persisted reports by ID using server-side
-`DRIFT_API_URL` / `DRIFT_API_KEY`. It shows label coverage and insufficient/single-class
-states, clears stale results on lookup errors, and never exposes the operator key.
+## Demonstration results
 
-## Experiment
+Seeded (42) synthetic experiment: a median-imputation + logistic-regression model
+fitted on 4,000 rows, evaluated on six independent 1,000-row windows.
 
-```bash
-python -m venv .venv
-# Activate the environment, then:
-pip install -r requirements.txt
-python scripts/run_drift_experiments.py
-pytest -q
-uvicorn api.app:app --reload
-streamlit run streamlit_app/app.py
+| Window | Scenario | Status | Max PSI | F1 | ROC-AUC |
+| --- | --- | --- | ---: | ---: | ---: |
+| W1 | Stable baseline | HEALTHY | 0.011 | 0.704 | 0.747 |
+| W2 | Mild covariate shift | WARNING | 0.268 | 0.778 | 0.777 |
+| W3 | Severe covariate shift | WARNING | 1.630 | 0.837 | 0.802 |
+| W4 | Concept drift (labels reversed for one cohort) | HEALTHY | 0.024 | 0.450 | 0.489 |
+| W5 | Null spike (30% missing `freight_ratio`) | WARNING | 0.020 | 0.703 | 0.735 |
+| W6 | Multi-feature drift | CRITICAL_DRIFT | 1.725 | 0.943 | 0.820 |
+
+What this shows, and what it doesn't:
+
+- **Concept drift (W4) produced no PSI alert** while F1 fell to 0.450. Input-drift checks
+  alone do not catch every performance failure.
+- **Covariate shift did not hurt the model here (W2, W3, W6).** Outcomes are regenerated
+  from the same synthetic rule, so F1 rose. High PSI is not evidence of degradation.
+- The six windows are designed cases, not random repetitions. Their Pearson correlations
+  (PSI vs F1 0.759, PSI vs ROC-AUC 0.565) are descriptive only: no significance test,
+  no causal claim, no lead-time claim.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Demo[Synthetic demo]
+        S[Synthetic reference<br/>seed 42] --> B[POST /api/monitor/batch]
+    end
+    subgraph Pilot[Fraud pilot]
+        X[fraud-events-v1 export] --> W[POST /api/monitor/fraud-window]
+        R[(Training-only reference<br/>SHA-256 pinned)] --> W
+    end
+    B --> D[Detectors<br/>PSI / KS / Wasserstein / chi-square]
+    W --> D
+    W --> L[Mature-label metrics<br/>+ coverage]
+    D --> Rep[(SQLite report history)]
+    L --> Rep
+    Rep --> G[GET /api/reports/id]
+    Rep --> U[Streamlit dashboard]
 ```
 
-The benchmark trains a median-imputation + logistic-regression classifier on seeded synthetic baseline data and measures each independently generated 1,000-row window. It reports observed drift metrics, F1, ROC-AUC, and missing fractions. The concept-drift scenario reverses labels for one cohort; covariate scenarios shift features and regenerate outcomes from the same synthetic rule. Results are intended to exercise the code paths, not estimate real-world detector sensitivity.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## Interpretation and limits
+## Quickstart
 
-- PSI and distance metrics measure distribution differences, not downstream business harm. Thresholds are operational heuristics and need calibration for the data and sample sizes in use.
-- KS and chi-square p-values depend on assumptions and sample size. They are included as diagnostics, not automatic proof of material drift.
-- The six windows are designed cases, not independent random repetitions. Their Pearson correlation is exploratory; no inferential test is performed.
-- The controlled time windows have no timestamps or repeated trajectories, so the experiment cannot support “lead indicator,” “predicts failure,” or “degradation by days” claims.
-- The sample model, feature distributions, labels, and injected shifts are synthetic; no production seller or customer dataset is bundled or required.
-- The synthetic UI remains a demonstration. The fraud API adds operator authentication and persistent reports; tenant authorization, automated alert delivery, monitoring of the monitor and cloud availability/load evidence remain open.
-- The default API reference is synthetic. Real deployment requires a validated, versioned training/reference dataset, threshold governance, authenticated access, label-aware performance monitoring, data retention controls, and operational runbooks.
+Requires Python 3.11.
+
+```bash
+git clone https://github.com/sachin2967/model-monitoring-drift-platform.git
+cd model-monitoring-drift-platform
+python -m venv .venv && source .venv/bin/activate     # Windows: .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+make experiment   # regenerate drift_benchmark_report.json
+make test         # lint + 28 tests
+make api          # http://127.0.0.1:8030/docs
+make dashboard    # Streamlit cockpit
+```
+
+Or with Docker: `docker compose up --build` (API and dashboard bind to loopback on
+8030 and 8530).
+
+## API
+
+| Route | Purpose |
+| --- | --- |
+| `GET /live` | Process liveness |
+| `GET /ready`, `/health` | Report history and reference configuration checks |
+| `POST /api/monitor/batch` | Synthetic-reference demo; 25-5,000 records with the four monitored features |
+| `POST /api/monitor/fraud-window` | Fraud cohort monitoring against the configured reference |
+| `GET /api/reports/{report_id}` | Retrieve a persisted report |
+| `GET /api/benchmark` | Synthetic benchmark report |
+
+Production mode (`APP_ENV=production`) requires a 32+ character `DRIFT_API_KEY`, a
+persistent `DRIFT_STATE_PATH`, `FRAUD_REFERENCE_PATH` and a trusted
+`FRAUD_REFERENCE_SHA256`. Non-health routes require `X-API-Key`; bodies are capped at
+4 MiB. See [docs/OPERATIONS.md](docs/OPERATIONS.md) and `.env.example`.
 
 ## Methods
 
-For numeric features, PSI uses bins derived from the reference distribution; KS and Wasserstein compare non-missing samples. Missingness is reported separately and a high current missing fraction is flagged. Categorical features use a chi-square contingency test. The overall status aggregates feature flags and should be interpreted as a configurable heuristic, not a calibrated risk probability.
+PSI uses 10 quantile bins derived from the reference distribution. The code's
+heuristic bands are PSI < 0.10 stable, 0.10-0.25 moderate and >= 0.25 significant;
+the detector's flag threshold defaults to 0.20, with KS alpha 0.01. KS and Wasserstein
+use non-missing values; missingness is reported separately. These thresholds are
+operational heuristics that have not been calibrated on live traffic.
 
-## Release verification and operations
+## Repository layout
 
-The 22 November 2026 local verification passed **28 tests** and repository lint.
-The API image passed non-root, network-isolated reference, report persistence and serving checks.
+| Path | Responsibility |
+| --- | --- |
+| `src/drift/detectors.py` | PSI, KS, Wasserstein, chi-square, status aggregation |
+| `src/drift/fraud.py` | Fraud event schema, reference loading, cohort and label metrics |
+| `src/drift/history.py` | SQLite report persistence |
+| `src/drift/simulator.py`, `synthetic.py` | Synthetic data and drift injection |
+| `src/drift/correlation.py` | Descriptive PSI-vs-metric correlations |
+| `api/app.py` | FastAPI application |
+| `streamlit_app/` | Synthetic dashboard plus **Fraud Pilot** page |
+| `scripts/run_drift_experiments.py` | Reproducible synthetic experiment |
+| `tests/` | 28 tests |
+| `docs/` | Architecture, limits, operations |
 
-See the standalone [operations guide](docs/OPERATIONS.md) for configuration,
-failure handling, recovery and rollout limits. Cross-project reports and replay tools
-live in the separate [portfolio guide](https://github.com/sachin2967/ml-portfolio).
-Hosted CI and cloud deployment are separate checks; a local pass does not imply either.
+## Limitations
+
+See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) for the full list. In short: synthetic
+demo data, no inferential claims from six windows, thresholds uncalibrated, labels may be
+selective, and tenant authorization, automated alert delivery, model promotion,
+monitoring of the monitor and cloud load/availability evidence are not implemented.
+
+## Related projects
+
+[Fraud risk scoring](https://github.com/sachin2967/fraud-risk-scoring-pipeline) (produces
+the exports and reference) ·
+[Portfolio guide](https://github.com/sachin2967/ml-portfolio)
+
+## License
+
+MIT.

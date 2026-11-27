@@ -1,0 +1,178 @@
+{
+  "protocol": "repeated-drift-v1",
+  "reference_seed": 42,
+  "reference_rows": 4000,
+  "fixed_thresholds": {
+    "psi_red": 0.2,
+    "psi_yellow": 0.1,
+    "ks_alpha": 0.01
+  },
+  "results": [
+    {
+      "scenario": "stable_null",
+      "window_rows": 250,
+      "repetitions": 100,
+      "any_feature_flag_rate": 0.04,
+      "any_feature_flag_95_wilson": [
+        0.01566330399154762,
+        0.0983707143588792
+      ],
+      "window_alert_rate": 0.04,
+      "window_alert_95_wilson": [
+        0.01566330399154762,
+        0.0983707143588792
+      ],
+      "mean_model_roc_auc": 0.7441366745742153
+    },
+    {
+      "scenario": "mean_shift_0.5sd",
+      "window_rows": 250,
+      "repetitions": 100,
+      "any_feature_flag_rate": 1.0,
+      "any_feature_flag_95_wilson": [
+        0.9630065017930143,
+        1.0
+      ],
+      "window_alert_rate": 1.0,
+      "window_alert_95_wilson": [
+        0.9630065017930143,
+        1.0
+      ],
+      "mean_model_roc_auc": 0.743764666747673
+    },
+    {
+      "scenario": "mean_shift_1.5sd",
+      "window_rows": 250,
+      "repetitions": 100,
+      "any_feature_flag_rate": 1.0,
+      "any_feature_flag_95_wilson": [
+        0.9630065017930143,
+        1.0
+      ],
+      "window_alert_rate": 1.0,
+      "window_alert_95_wilson": [
+        0.9630065017930143,
+        1.0
+      ],
+      "mean_model_roc_auc": 0.7459214872291627
+    },
+    {
+      "scenario": "missing_30pct",
+      "window_rows": 250,
+      "repetitions": 100,
+      "any_feature_flag_rate": 1.0,
+      "any_feature_flag_95_wilson": [
+        0.9630065017930143,
+        1.0
+      ],
+      "window_alert_rate": 1.0,
+      "window_alert_95_wilson": [
+        0.9630065017930143,
+        1.0
+      ],
+      "mean_model_roc_auc": 0.7274910549558736
+    },
+    {
+      "scenario": "label_reversal",
+      "window_rows": 250,
+      "repetitions": 100,
+      "any_feature_flag_rate": 0.04,
+      "any_feature_flag_95_wilson": [
+        0.01566330399154762,
+        0.0983707143588792
+      ],
+      "window_alert_rate": 0.04,
+      "window_alert_95_wilson": [
+        0.01566330399154762,
+        0.0983707143588792
+      ],
+      "mean_model_roc_auc": 0.2558633254257847
+    },
+    {
+      "scenario": "stable_null",
+      "window_rows": 1000,
+      "repetitions": 100,
+      "any_feature_flag_rate": 0.0,
+      "any_feature_flag_95_wilson": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "window_alert_rate": 0.0,
+      "window_alert_95_wilson": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "mean_model_roc_auc": 0.7479085237313597
+    },
+    {
+      "scenario": "mean_shift_0.5sd",
+      "window_rows": 1000,
+      "repetitions": 100,
+      "any_feature_flag_rate": 1.0,
+      "any_feature_flag_95_wilson": [
+        0.9630065017930143,
+        1.0
+      ],
+      "window_alert_rate": 1.0,
+      "window_alert_95_wilson": [
+        0.9630065017930143,
+        1.0
+      ],
+      "mean_model_roc_auc": 0.7496406832204204
+    },
+    {
+      "scenario": "mean_shift_1.5sd",
+      "window_rows": 1000,
+      "repetitions": 100,
+      "any_feature_flag_rate": 1.0,
+      "any_feature_flag_95_wilson": [
+        0.9630065017930143,
+        1.0
+      ],
+      "window_alert_rate": 1.0,
+      "window_alert_95_wilson": [
+        0.9630065017930143,
+        1.0
+      ],
+      "mean_model_roc_auc": 0.7517507058438655
+    },
+    {
+      "scenario": "missing_30pct",
+      "window_rows": 1000,
+      "repetitions": 100,
+      "any_feature_flag_rate": 1.0,
+      "any_feature_flag_95_wilson": [
+        0.9630065017930143,
+        1.0
+      ],
+      "window_alert_rate": 1.0,
+      "window_alert_95_wilson": [
+        0.9630065017930143,
+        1.0
+      ],
+      "mean_model_roc_auc": 0.729281867194128
+    },
+    {
+      "scenario": "label_reversal",
+      "window_rows": 1000,
+      "repetitions": 100,
+      "any_feature_flag_rate": 0.0,
+      "any_feature_flag_95_wilson": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "window_alert_rate": 0.0,
+      "window_alert_95_wilson": [
+        3.469446951953614e-18,
+        0.03699349820698568
+      ],
+      "mean_model_roc_auc": 0.25209147626864026
+    }
+  ],
+  "limitations": [
+    "Synthetic sensitivity/null study, conditional on one frozen reference; not production false-positive rates.",
+    "No threshold tuning on these outcomes. Feature tests are not multiplicity-corrected.",
+    "Wilson intervals assume independent repetitions within a scenario; scenarios are deliberately paired.",
+    "Feature-only diagnostics cannot detect label reversal when features do not change."
+  ]
+}

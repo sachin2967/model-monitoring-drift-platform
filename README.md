@@ -11,6 +11,10 @@ exported prediction cohorts against a versioned training-only reference.
 > **Scope.** A portfolio prototype, not a production monitoring service. The
 > demonstration experiment uses generated data and six designed scenarios. Feature
 > drift is not model failure; performance monitoring needs reliable delayed labels.
+>
+> **Try it locally:** follow the [Quickstart](#quickstart) and inspect the
+> [synthetic drift dashboard preview](docs/images/synthetic-drift-dashboard.png).
+> The six scenarios are controlled demonstrations, not observed production incidents.
 
 ![Streamlit dashboard for controlled synthetic drift scenarios](docs/images/synthetic-drift-dashboard.png)
 

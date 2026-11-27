@@ -12,6 +12,10 @@ exported prediction cohorts against a versioned training-only reference.
 > demonstration experiment uses generated data and six designed scenarios. Feature
 > drift is not model failure; performance monitoring needs reliable delayed labels.
 
+![Streamlit dashboard for controlled synthetic drift scenarios](docs/images/synthetic-drift-dashboard.png)
+
+*Local dashboard showing the synthetic drift scenarios and their descriptive diagnostic scores.*
+
 ## Highlights
 
 - **Multiple detectors, reported separately:** quantile-binned PSI, two-sample KS,
